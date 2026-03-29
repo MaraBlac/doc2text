@@ -22,3 +22,8 @@ export:
     - "txt"
     - "html"
   encoding: "utf-8"
+
+ocr:
+  enabled: true
+  language: "eng"
+  dpi: 2.0
