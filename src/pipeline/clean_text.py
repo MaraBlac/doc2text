@@ -17,24 +17,8 @@ def clean_text(text: str) -> str:
     # Normalize line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Remove page numbers (basic heuristic)
+    # Remove short lines (page numbers, footers, etc.)
     lines = text.split("\n")
-    cleaned_lines = []
-    for line in lines:
-        line = line.strip()
-        if len(line) < 50:  # Skip short lines that might be page numbers
-            continue
-        cleaned_lines.append(line)
+    cleaned_lines = [line for line in lines if len(line.strip()) > 30]
 
-    text = "\n".join(cleaned_lines)
-
-    return text
-
-
-def main():
-    sample = "  Hello   World  \n\n   Page 1   "
-    print(clean_text(sample))
-
-
-if __name__ == "__main__":
-    main()
+    return "\n".join(cleaned_lines)

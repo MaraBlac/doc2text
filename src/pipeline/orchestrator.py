@@ -1,6 +1,10 @@
 """
 Pipeline orchestrator for coordinating processing steps.
 """
+from .extract_pdf import extract_from_pdf
+from .clean_text import clean_text
+from .chunk_text import chunk_text
+from .export_txt import export_to_txt
 
 
 def run_pipeline(input_path: str, output_path: str, config: dict = None):
@@ -13,15 +17,14 @@ def run_pipeline(input_path: str, output_path: str, config: dict = None):
         config: Optional config dict with keys:
             - use_ocr: bool, enable OCR for scanned PDFs
             - ocr_lang: str, language code for OCR (default: 'eng')
+
+    Returns:
+        dict with processing results
     """
-    from .extract_pdf import extract_from_pdf
-    from .clean_text import clean_text
-    from .chunk_text import chunk_text
-    from .export_txt import export_to_txt
+    use_ocr = config.get('use_ocr', True) if config else True
+    ocr_lang = config.get('ocr_lang', 'eng') if config else 'eng'
 
     # Extract PDF (with OCR if configured)
-    use_ocr = config.get('use_ocr', True)
-    ocr_lang = config.get('ocr_lang', 'eng') if config else 'eng'
     text_content = extract_from_pdf(input_path, use_ocr=use_ocr)
 
     # Clean text
@@ -39,21 +42,3 @@ def run_pipeline(input_path: str, output_path: str, config: dict = None):
         "chunks": len(chunks),
         "used_ocr": use_ocr
     }
-
-
-def main():
-    """Main entry point."""
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="Input PDF path")
-    parser.add_argument("output", help="Output text path")
-    args = parser.parse_args()
-
-    result = run_pipeline(args.input, args.output)
-    print(f"Processed: {result['input']} -> {result['output']}")
-    print(f"Chunks created: {result['chunks']}")
-
-
-if __name__ == "__main__":
-    main()
