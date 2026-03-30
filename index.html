@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>doc2text - PDF to Text Converter (Browser-Based)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .upload-subtext {
+            color: #888;
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-card {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        .result-meta {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .status-success {
+            color: #28a745;
+        }
+
+        .status-processing {
+            color: #ffc107;
+        }
+
+        .status-error {
+            color: #dc3545;
+        }
+
+        .error {
+            color: #dc3545;
+            padding: 15px;
+            background: #ffe6e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .feature {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .feature i {
+            display: block;
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 8px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 doc2text</h1>
+            <p>PDF to Text Converter</p>
+            <span class="badge">🔒 No server - runs entirely in your browser!</span>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card">
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdf_file').click()">
+                <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" onchange="handleUpload(event)">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Click to upload or drag & drop</div>
+                <div class="upload-subtext">PDF files processed locally - no upload required</div>
+            </div>
+            <div class="error" id="errorMessage"></div>
+
+            <!-- Processing Status -->
+            <div id="processingStatus" style="display: none;">
+                <div class="result-name status-processing">🔄 Processing...</div>
+                <div class="result-meta" id="statusMessage"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="result-section" id="resultSection">
+            <div class="card result-card">
+                <h3 style="margin-bottom: 15px; color: #333;">📋 Conversion Results</h3>
+                <div id="resultsList"></div>
+                <div style="text-align: center;">
+                    <a href="index.html" class="btn">Upload Another File</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="card" style="margin-top: 30px;">
+            <h3 style="margin-bottom: 20px; color: #333;">🚀 Features</h3>
+            <div class="features">
+                <div class="feature">
+                    <i>⚡</i>
+                    <strong>Fast Extraction</strong><br>
+                    Using PDF.js
+                </div>
+                <div class="feature">
+                    <i>🔍</i>
+                    <strong>OCR Fallback</strong><br>
+                    Tesseract.js for images
+                </div>
+                <div class="feature">
+                    <i>🔒</i>
+                    <strong>Privacy First</strong><br>
+                    Files never leave your device
+                </div>
+                <div class="feature">
+                    <i>💻</i>
+                    <strong>No Installation</strong><br>
+                    Just open in browser
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let results = [];
+
+        function handleUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+                showError('Please upload a PDF file.');
+                return;
+            }
+
+            // Show processing status
+            document.getElementById('uploadArea').style.display = 'none';
+            document.getElementById('processingStatus').style.display = 'block';
+            document.getElementById('resultSection').classList.remove('show');
+            document.getElementById('errorMessage').classList.remove('show');
+
+            processPDF(file);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.classList.add('show');
+        }
+
+        function processPDF(file) {
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                const typedarray = new Uint8Array(e.target.result);
+
+                try {
+                    // Load PDF document
+                    const loadingTask = pdfjsLib.getDocument(typedarray);
+                    const pdf = await loadingTask.promise;
+
+                    let extractedText = '';
+                    let hasContent = false;
+                    let extractionMethod = '';
+
+                    // Try text extraction first
+                    try {
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+
+                            // Map text items to lines
+                            const splitText = textContent.items.map(item => {
+                                return {
+                                    str: item.str,
+                                    transform: item.transform
+                                };
+                            });
+
+                            let line = '';
+                            for (const item of splitText) {
+                                line += item.str;
+                                if (line.length > 200) {
+                                    extractedText += line + '\n';
+                                    line = '';
+                                }
+                            }
+                            if (line) {
+                                extractedText += line + '\n';
+                            }
+                        }
+
+                        if (extractedText.length > 200) {
+                            extractionMethod = 'PDF.js text extraction';
+                        } else {
+                            // Fallback to OCR
+                            extractionMethod = 'Tesseract OCR';
+                            extractedText = await extractViaOCR(file);
+                        }
+                    } catch (err) {
+                        // Text extraction failed, use OCR
+                        extractionMethod = 'Tesseract OCR';
+                        extractedText = await extractViaOCR(file);
+                    }
+
+                    // Show results
+                    displayResults(file.name, file.size, extractedText, extractionMethod);
+
+                } catch (err) {
+                    console.error('Error processing PDF:', err);
+                    showError('Error: ' + err.message);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function extractViaOCR(file) {
+            return new Promise((resolve, reject) => {
+                const statusMessage = document.getElementById('statusMessage');
+                const progressFill = document.getElementById('progressFill');
+
+                statusMessage.textContent = 'Using OCR (image-based PDF)...';
+
+                const worker = Tesseract.createWorker();
+
+                worker.on('status', function(status) {
+                    statusMessage.textContent = 'OCR status: ' + status;
+                });
+
+                worker.on('progress', function({progress}) {
+                    progressFill.style.width = (progress * 100) + '%';
+                });
+
+                worker.on('recognize', function() {
+                    progressFill.style.width = '50%';
+                });
+
+                worker.on('recognizing', function() {
+                    progressFill.style.width = '60%';
+                });
+
+                worker.on('recognizer_loaded', function(recognizer) {
+                    progressFill.style.width = '80%';
+                });
+
+                worker.on('loaded', async function() {
+                    progressFill.style.width = '90%';
+                    const pdf = await pdfjsLib.getDocument(file.arrayBuffer).promise;
+                    const canvases = [];
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({scale: 2});
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const context = canvas.getContext('2d');
+                        await page.render({canvasContext: context}).promise;
+                        canvases.push(canvas);
+                    }
+
+                    const images = canvases.map(canvas => canvas.toDataURL('image/jpeg', 0.8));
+                    const data = {
+                        images: images
+                    };
+
+                    const {data: {text}} = await worker.recognize(data);
+
+                    await worker.terminate();
+                    resolve(text);
+                });
+
+                worker.on('tessdata_loaded', function() {
+                    progressFill.style.width = '30%';
+                });
+
+                worker.on('initialization', function() {
+                    progressFill.style.width = '20%';
+                });
+
+                worker.initialize({
+                    language: 'eng',
+                    esm_path: null,
+                    worker: true
+                }).then(resolve).catch(reject);
+            });
+        }
+
+        function displayResults(filename, filesize, text, method) {
+            results.push({
+                filename: filename,
+                filesize: filesize,
+                text: text,
+                method: method,
+                timestamp: new Date().toLocaleString()
+            });
+
+            // Show results section
+            document.getElementById('processingStatus').style.display = 'none';
+            document.getElementById('resultSection').classList.add('show');
+
+            // Create result items
+            const resultsList = document.getElementById('resultsList');
+
+            results.forEach((result, index) => {
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `
+                    <div class="result-name status-success">✅ ${result.filename}</div>
+                    <div class="result-meta">
+                        Size: ${(result.filesize / 1024).toFixed(2)} KB |
+                        Method: ${result.method}
+                    </div>
+                    <div class="result-meta" style="margin-top: 5px; color: #888;">
+                        Time: ${result.timestamp}
+                    </div>
+                    <div style="margin-top: 10px; padding: 15px; background: #f8f9ff; border-radius: 8px; font-size: 0.9rem; max-height: 300px; overflow: auto;">
+                        ${escapeHtml(result.text)}
+                    </div>
+                    <div style="text-align: center; margin-top: 10px;">
+                        <a href="#" class="btn" style="padding: 8px 20px; font-size: 0.9rem;" onclick="copyToClipboard(this)">📋 Copy to Clipboard</a>
+                        <a href="#" class="btn" style="padding: 8px 20px; font-size: 0.9rem; background: #28a745;" onclick="downloadFile(this, '${result.filename}.txt')">📥 Download</a>
+                    </div>
+                `;
+                resultsList.appendChild(div);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function copyToClipboard(btn) {
+            const text = results[results.length - 1].text;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        function downloadFile(btn, filename) {
+            const text = results[results.length - 1].text;
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Drag and drop support
+        const uploadArea = document.getElementById('uploadArea');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            uploadArea.classList.add('dragover');
+        }
+
+        function unhighlight() {
+            uploadArea.classList.remove('dragover');
+        }
+
+        uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            const input = document.getElementById('pdf_file');
+            input.files = files;
+            handleUpload({target: input});
+        }
+    </script>
+</body>
+</html>
